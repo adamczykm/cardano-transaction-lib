@@ -15,7 +15,7 @@ import Types (
 
 estimateTxFees :: Cbor -> AppM Fee
 estimateTxFees cbor = do
-  decoded <- either (throwM . Decode) pure $ decodeCborTx cbor
+  decoded <- either (throwM . DecodeError) pure $ decodeCborTx cbor
   pparams <- asks protocolParams
   pure . Fee $ estimateFee pparams decoded
 

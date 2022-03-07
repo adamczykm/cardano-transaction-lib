@@ -190,7 +190,7 @@ instance ToJSON ExUnits where
 -- Errors
 
 -- We'll probably extend this with more error types over time
-newtype CardanoBrowserServerError = Decode DecodeError
+newtype CardanoBrowserServerError = DecodeError DecodeError
   deriving stock (Show)
 
 instance Exception CardanoBrowserServerError
