@@ -65,6 +65,7 @@ library
     , servant-docs
     , servant-server
     , text
+    , time
     , wai-cors
     , warp
 

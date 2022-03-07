@@ -10,7 +10,7 @@ module Types (
 
 import Cardano.Api.Shelley qualified as Shelley
 import Cardano.Binary qualified as Cbor
-import Cardano.Slotting.Time (SystemStart)
+import Cardano.Slotting.Time (SystemStart (SystemStart))
 import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
@@ -22,6 +22,7 @@ import Data.Aeson.Types (withText)
 import Data.Kind (Type)
 import Data.Text (Text)
 import Data.Text qualified as Text
+import Data.Time.Format.ISO8601 (iso8601ParseM)
 import GHC.Generics (Generic)
 import Paths_cardano_browser_tx_server (getDataFileName)
 import Servant (FromHttpApiData, QueryParam', Required, ToHttpApiData)
@@ -46,14 +47,21 @@ data Env = Env
   }
   deriving stock (Generic)
 
-newEnvIO :: SystemStart -> IO Env
-newEnvIO systemStart = Env systemStart <$> readParams
+newEnvIO :: IO Env
+newEnvIO = Env <$> decodeSystemStart <*> readParams
   where
     readParams :: IO Shelley.ProtocolParameters
     readParams =
       either die pure
         =<< Aeson.eitherDecodeFileStrict @Shelley.ProtocolParameters
         =<< getDataFileName "config/pparams.json"
+
+decodeSystemStart :: IO SystemStart
+decodeSystemStart = SystemStart <$> iso8601ParseM shelleySystemStart
+  where
+    shelleySystemStart :: String
+    -- System start time from the Shelley genesis file
+    shelleySystemStart = "2019-07-24T20:20:16Z"
 
 newtype Cbor = Cbor Text
   deriving stock (Show)
