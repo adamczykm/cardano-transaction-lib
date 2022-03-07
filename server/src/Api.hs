@@ -5,6 +5,7 @@ module Api (
   apiDocs,
 ) where
 
+import Api.ExUnits qualified as ExUnits
 import Api.Fees qualified as Fees
 import Control.Monad.Catch (try)
 import Control.Monad.Except (throwError)
@@ -48,9 +49,9 @@ import Utils (lbshow)
 
 type Api =
   "fees" :> QueryParam' '[Required] "tx" Cbor :> Get '[JSON] Fee
-   -- This doesn't need to be a post request of course, but it would probably be
-   -- less straightforward to URL-encode the JSON utxo on the client and pass
-   -- it as a query param
+    -- This doesn't need to be a post request of course, but it would probably be
+    -- less straightforward to URL-encode the JSON utxo on the client and pass
+    -- it as a query param
     :<|> "ex-units"
       :> ReqBody '[JSON] ExUnitsRequest
       :> Post '[JSON] ExUnitsResponse
@@ -83,7 +84,7 @@ api :: Proxy Api
 api = Proxy
 
 server :: ServerT Api AppM
-server = Fees.estimateTxFees :<|> error "TODO"
+server = Fees.estimateTxFees :<|> ExUnits.calculateExUnits
 
 apiDocs :: Docs.API
 apiDocs = Docs.docs api
