@@ -116,8 +116,8 @@ data ExUnitsRequest = ExUnitsRequest
 instance FromJSON ExUnitsRequest where
   parseJSON = Aeson.genericParseJSON Aeson.defaultOptions
 
--- @evaluateTransactionExecutionUnits@ returns a @Map@ which is not particularly
--- JSON-friendly
+-- @evaluateTransactionExecutionUnits@ returns a @Map@ which would not be
+-- particularly JSON-friendly as it would have @ScriptWitnessIndex@ keys
 newtype ExUnitsResponse = ExUnitsResponse [RedeemerResult]
   deriving stock (Show, Generic)
   deriving newtype (Eq)
