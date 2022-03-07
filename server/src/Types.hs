@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
 module Types (
@@ -27,7 +28,6 @@ import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (MonadReader, ReaderT)
 import Data.Aeson (FromJSON (parseJSON), KeyValue ((.=)), ToJSON (toJSON))
 import Data.Aeson qualified as Aeson
-import Data.Aeson.Encoding qualified as Aeson.Encoding
 import Data.Aeson.Types (withText)
 import Data.Bifunctor (bimap, second)
 import Data.Kind (Type)
@@ -86,23 +86,25 @@ newtype Cbor = Cbor Text
     , ToJSON
     )
 
+-- Some integral values should be stringified before being sent to the frontend
+-- to avoid precision loss with Purescript\'s JSON decoder. This type provides
+-- @To@/@FromJSON@ instances where this might be desirable
+newtype Stringified (a :: Type) = Stringified a
+
+instance Show a => ToJSON (Stringified a) where
+  toJSON (Stringified x) = Aeson.String $ tshow x
+
+instance Read a => FromJSON (Stringified a) where
+  parseJSON =
+    withText "Stringified" $
+      maybe (fail "Expected quoted integral type") (pure . Stringified)
+        . readMaybe @a
+        . Text.unpack
+
 newtype Fee = Fee Integer
   deriving stock (Show, Generic)
   deriving newtype (Eq)
-
-instance ToJSON Fee where
-  -- to avoid issues with integer parsing in PS, we should probably return
-  -- a JSON string, and not a number
-  toJSON (Fee int) = Aeson.String $ tshow int
-
-  toEncoding (Fee int) = Aeson.Encoding.integerText int
-
-instance FromJSON Fee where
-  parseJSON =
-    withText "Fee" $
-      maybe (fail "Expected quoted integer") (pure . Fee)
-        . readMaybe @Integer
-        . Text.unpack
+  deriving (ToJSON, FromJSON) via Stringified Integer
 
 data ExUnitsRequest = ExUnitsRequest
   { -- | CBOR-encoded transaction. Technically we only need the tx body for
@@ -166,15 +168,9 @@ data RedeemerTag
 
 newtype ScriptIndex = ScriptIndex Word
   deriving stock (Show, Eq)
-  deriving newtype (FromJSON)
+  deriving (FromJSON, ToJSON) via Stringified Word
 
-instance ToJSON ScriptIndex where
-  -- to avoid issues with integer parsing in PS, we should probably return
-  -- a JSON string, and not a number
-  toJSON (ScriptIndex w) = Aeson.String $ tshow w
-
-  toEncoding (ScriptIndex w) = Aeson.Encoding.integerText $ toInteger w
-
+-- TODO replace this with data type holding `Stringified` fields
 newtype ExUnits = ExUnits C.ExecutionUnits
   deriving stock (Show, Generic)
   deriving newtype (Eq, FromJSON)
