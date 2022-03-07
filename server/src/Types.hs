@@ -7,7 +7,7 @@ module Types (
   Fee (..),
   ExUnitsRequest (..),
   ExUnitsResponse (..),
-  RedeemerResult (..),
+  ExUnitsResult (..),
   RedeemerTag (..),
   ScriptIndex (..),
   ExUnits (..),
@@ -118,7 +118,7 @@ instance FromJSON ExUnitsRequest where
 
 -- @evaluateTransactionExecutionUnits@ returns a @Map@ which would not be
 -- particularly JSON-friendly as it would have @ScriptWitnessIndex@ keys
-newtype ExUnitsResponse = ExUnitsResponse [RedeemerResult]
+newtype ExUnitsResponse = ExUnitsResponse [ExUnitsResult]
   deriving stock (Show, Generic)
   deriving newtype (Eq)
 
@@ -136,11 +136,11 @@ exUnitsFromCardanoMap = ExUnitsResponse . fmap (uncurry f) . Map.toList
     f ::
       C.ScriptWitnessIndex ->
       Either C.ScriptExecutionError C.ExecutionUnits ->
-      RedeemerResult
+      ExUnitsResult
     f swi es =
       let (tag, index) = convertIndex swi
           exUnits = bimap tshow ExUnits es
-       in RedeemerResult {tag, index, exUnits}
+       in ExUnitsResult {tag, index, exUnits}
 
     convertIndex :: C.ScriptWitnessIndex -> (RedeemerTag, ScriptIndex)
     convertIndex =
@@ -150,7 +150,7 @@ exUnitsFromCardanoMap = ExUnitsResponse . fmap (uncurry f) . Map.toList
         C.ScriptWitnessIndexCertificate idx -> (Cert, idx)
         C.ScriptWitnessIndexWithdrawal idx -> (Reward, idx)
 
-data RedeemerResult = RedeemerResult
+data ExUnitsResult = ExUnitsResult
   { tag :: RedeemerTag
   , index :: ScriptIndex
   , -- @ScriptExecutionError@ has no @ToJSON@ instance, so can be converted to
@@ -159,7 +159,7 @@ data RedeemerResult = RedeemerResult
   }
   deriving stock (Show, Eq, Generic)
 
-instance ToJSON RedeemerResult where
+instance ToJSON ExUnitsResult where
   toJSON = Aeson.genericToJSON Aeson.defaultOptions
 
 data RedeemerTag
