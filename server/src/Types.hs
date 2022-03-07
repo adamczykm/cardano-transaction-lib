@@ -3,11 +3,18 @@ module Types (
   Env (..),
   Cbor (..),
   Fee (..),
+  ExUnitsRequest (..),
+  ExUnitsResponse (..),
+  RedeemerResult (..),
+  RedeemerTag (..),
+  ScriptIndex (..),
+  ExUnits (..),
   DecodeError (..),
   CardanoBrowserServerError (..),
   newEnvIO,
 ) where
 
+import Cardano.Api qualified as C
 import Cardano.Api.Shelley qualified as Shelley
 import Cardano.Binary qualified as Cbor
 import Cardano.Slotting.Time (SystemStart (SystemStart))
@@ -15,7 +22,7 @@ import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (MonadReader, ReaderT)
-import Data.Aeson (FromJSON, ToJSON (..))
+import Data.Aeson (FromJSON (parseJSON), KeyValue ((.=)), ToJSON (toJSON))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Encoding qualified as Aeson.Encoding
 import Data.Aeson.Types (withText)
@@ -65,7 +72,12 @@ decodeSystemStart = SystemStart <$> iso8601ParseM shelleySystemStart
 
 newtype Cbor = Cbor Text
   deriving stock (Show)
-  deriving newtype (Eq, FromHttpApiData, ToHttpApiData)
+  deriving newtype
+    ( Eq
+    , FromHttpApiData
+    , ToHttpApiData
+    , FromJSON
+    )
 
 newtype Fee = Fee Integer
   deriving stock (Show, Generic)
@@ -84,6 +96,74 @@ instance FromJSON Fee where
       maybe (fail "Expected quoted integer") (pure . Fee)
         . readMaybe @Integer
         . Text.unpack
+
+data ExUnitsRequest = ExUnitsRequest
+  { -- | CBOR-encoded transaction. Technically we only need the tx body for
+    -- @evaluateTransactionExecutionUnits@, but we may need the signatures if
+    -- re-writing that function is necessary. See:
+    -- https://github.com/input-output-hk/cardano-node/issues/3307
+    tx :: Cbor
+  , utxo :: C.UTxO C.AlonzoEra
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance FromJSON ExUnitsRequest where
+  parseJSON = Aeson.genericParseJSON Aeson.defaultOptions
+
+-- @evaluateTransactionExecutionUnits@ returns a @Map@ which is not particularly
+-- JSON-friendly
+newtype ExUnitsResponse = ExUnitsResponse [RedeemerResult]
+  deriving stock (Show, Generic)
+  deriving newtype (Eq)
+
+instance ToJSON ExUnitsResponse where
+  toJSON = Aeson.genericToJSON Aeson.defaultOptions
+
+data RedeemerResult = RedeemerResult
+  { tag :: RedeemerTag
+  , index :: ScriptIndex
+  -- @ScriptExecutionError@ has to @ToJSON@ instance, so can be converted to
+  -- text instead
+  , exUnits :: Either Text ExUnits
+  }
+  deriving stock (Show, Eq, Generic)
+
+instance ToJSON RedeemerResult where
+  toJSON = Aeson.genericToJSON Aeson.defaultOptions
+
+data RedeemerTag
+  = Spend
+  | Mint
+  | Cert
+  | Reward
+  deriving stock (Show, Eq, Generic, Ord)
+
+instance ToJSON RedeemerTag where
+  toJSON = Aeson.genericToJSON Aeson.defaultOptions
+
+newtype ScriptIndex = ScriptIndex Word
+  deriving stock (Show, Eq)
+
+instance ToJSON ScriptIndex where
+  -- to avoid issues with integer parsing in PS, we should probably return
+  -- a JSON string, and not a number
+  toJSON (ScriptIndex w) = Aeson.String $ tshow w
+
+  toEncoding (ScriptIndex w) = Aeson.Encoding.integerText $ toInteger w
+
+newtype ExUnits = ExUnits C.ExecutionUnits
+  deriving stock (Show, Generic)
+  deriving newtype (Eq)
+
+instance ToJSON ExUnits where
+  toJSON (ExUnits (C.ExecutionUnits mem steps)) =
+    -- Again, encode naturals as text to avoid precision loss
+    Aeson.object
+      [ "mem" .= tshow mem
+      , "steps" .= tshow steps
+      ]
+
+-- Errors
 
 -- We'll probably extend this with more error types over time
 newtype CardanoBrowserServerError = Decode DecodeError
