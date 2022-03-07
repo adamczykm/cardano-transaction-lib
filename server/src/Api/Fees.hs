@@ -1,27 +1,21 @@
 module Api.Fees (estimateTxFees) where
 
+import Api.Utils (decodeCborTx)
 import Cardano.Api qualified as C
 import Cardano.Api.Shelley qualified as Shelley
 import Control.Monad.Catch (throwM)
 import Control.Monad.Reader (asks)
-import Data.Bifunctor (first)
-import Data.ByteString (ByteString)
-import Data.ByteString.Base16 qualified as Base16
-import Data.Proxy (Proxy (Proxy))
-import Data.Text (Text)
-import Data.Text.Encoding qualified as Text.Encoding
 import Types (
   AppM,
   CardanoBrowserServerError (..),
   Cbor (..),
   Env (..),
   Fee (..),
-  FeeEstimateError (..),
  )
 
 estimateTxFees :: Cbor -> AppM Fee
 estimateTxFees cbor = do
-  decoded <- either (throwM . FeeEstimate) pure $ decodeCborTx cbor
+  decoded <- either (throwM . Decode) pure $ decodeCborTx cbor
   pparams <- asks protocolParams
   pure . Fee $ estimateFee pparams decoded
 
@@ -39,12 +33,3 @@ estimateFee pparams (C.Tx txBody keyWits) = estimate
             -- No. of Byron key witnesses; there shouldn't be any of these and
             -- 'evaluateTransactionFee' won't work with them anyway
             0
-
-decodeCborTx :: Cbor -> Either FeeEstimateError (C.Tx C.AlonzoEra)
-decodeCborTx (Cbor txt) =
-  first InvalidCbor
-    . C.deserialiseFromCBOR (C.proxyToAsType Proxy)
-    =<< decode txt
-  where
-    decode :: Text -> Either FeeEstimateError ByteString
-    decode = first InvalidHex . Base16.decode . Text.Encoding.encodeUtf8

@@ -32,7 +32,7 @@ import Types (
   Cbor,
   Env,
   Fee,
-  FeeEstimateError (InvalidCbor, InvalidHex),
+  DecodeError (InvalidCbor, InvalidHex),
  )
 import Utils (lbshow)
 
@@ -58,7 +58,7 @@ appServer env = hoistServer api appHandler server
         handleError ::
           CardanoBrowserServerError ->
           Handler a
-        handleError (FeeEstimate fe) = case fe of
+        handleError (Decode fe) = case fe of
           InvalidCbor ic -> throwError err400 {errBody = lbshow ic}
           InvalidHex ih -> throwError err400 {errBody = LC8.pack ih}
 

@@ -3,7 +3,7 @@ module Types (
   Env (..),
   Cbor (..),
   Fee (..),
-  FeeEstimateError (..),
+  DecodeError (..),
   CardanoBrowserServerError (..),
   newEnvIO,
 ) where
@@ -86,17 +86,17 @@ instance FromJSON Fee where
         . Text.unpack
 
 -- We'll probably extend this with more error types over time
-newtype CardanoBrowserServerError = FeeEstimate FeeEstimateError
+newtype CardanoBrowserServerError = Decode DecodeError
   deriving stock (Show)
 
 instance Exception CardanoBrowserServerError
 
-data FeeEstimateError
+data DecodeError
   = InvalidCbor Cbor.DecoderError
   | InvalidHex String
   deriving stock (Show)
 
-instance Exception FeeEstimateError
+instance Exception DecodeError
 
 -- API doc stuff
 instance Docs.ToParam (QueryParam' '[Required] "tx" Cbor) where
