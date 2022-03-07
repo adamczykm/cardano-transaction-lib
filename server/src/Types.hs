@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
 module Types (
   AppM (AppM),
   Env (..),
@@ -12,6 +14,7 @@ module Types (
   DecodeError (..),
   CardanoBrowserServerError (..),
   newEnvIO,
+  exUnitsFromCardanoMap,
 ) where
 
 import Cardano.Api qualified as C
@@ -26,7 +29,10 @@ import Data.Aeson (FromJSON (parseJSON), KeyValue ((.=)), ToJSON (toJSON))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Encoding qualified as Aeson.Encoding
 import Data.Aeson.Types (withText)
+import Data.Bifunctor (bimap, second)
 import Data.Kind (Type)
+import Data.Map (Map)
+import Data.Map qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time.Format.ISO8601 (iso8601ParseM)
@@ -119,12 +125,37 @@ newtype ExUnitsResponse = ExUnitsResponse [RedeemerResult]
 instance ToJSON ExUnitsResponse where
   toJSON = Aeson.genericToJSON Aeson.defaultOptions
 
+exUnitsFromCardanoMap ::
+  Map
+    C.ScriptWitnessIndex
+    ( Either C.ScriptExecutionError C.ExecutionUnits
+    ) ->
+  ExUnitsResponse
+exUnitsFromCardanoMap = ExUnitsResponse . fmap (uncurry f) . Map.toList
+  where
+    f ::
+      C.ScriptWitnessIndex ->
+      Either C.ScriptExecutionError C.ExecutionUnits ->
+      RedeemerResult
+    f swi es =
+      let (tag, index) = convertIndex swi
+          exUnits = bimap tshow ExUnits es
+       in RedeemerResult {tag, index, exUnits}
+
+    convertIndex :: C.ScriptWitnessIndex -> (RedeemerTag, ScriptIndex)
+    convertIndex =
+      second ScriptIndex . \case
+        C.ScriptWitnessIndexTxIn idx -> (Spend, idx)
+        C.ScriptWitnessIndexMint idx -> (Mint, idx)
+        C.ScriptWitnessIndexCertificate idx -> (Cert, idx)
+        C.ScriptWitnessIndexWithdrawal idx -> (Reward, idx)
+
 data RedeemerResult = RedeemerResult
   { tag :: RedeemerTag
   , index :: ScriptIndex
-  -- @ScriptExecutionError@ has to @ToJSON@ instance, so can be converted to
-  -- text instead
-  , exUnits :: Either Text ExUnits
+  , -- @ScriptExecutionError@ has no @ToJSON@ instance, so can be converted to
+    -- text instead
+    exUnits :: Either Text ExUnits
   }
   deriving stock (Show, Eq, Generic)
 
