@@ -1,4 +1,9 @@
-module Api (app, getTransactionFeeEstimate, apiDocs) where
+module Api (
+  app,
+  getTransactionFeeEstimate,
+  getExUnits,
+  apiDocs,
+) where
 
 import Api.Fees qualified as Fees
 import Control.Monad.Catch (try)
@@ -14,14 +19,17 @@ import Servant (
   Handler,
   HasServer (ServerT),
   JSON,
+  Post,
   Proxy (..),
   QueryParam',
+  ReqBody,
   Required,
   Server,
   ServerError (errBody),
   err400,
   hoistServer,
   serve,
+  type (:<|>) ((:<|>)),
   type (:>),
  )
 import Servant.Client (ClientM, client)
@@ -30,13 +38,22 @@ import Types (
   AppM (..),
   CardanoBrowserServerError (..),
   Cbor,
-  Env,
-  Fee,
   DecodeError (InvalidCbor, InvalidHex),
+  Env,
+  ExUnitsRequest,
+  ExUnitsResponse,
+  Fee,
  )
 import Utils (lbshow)
 
-type Api = "fees" :> QueryParam' '[Required] "tx" Cbor :> Get '[JSON] Fee
+type Api =
+  "fees" :> QueryParam' '[Required] "tx" Cbor :> Get '[JSON] Fee
+   -- This doesn't need to be a post request of course, but it would probably be
+   -- less straightforward to URL-encode the JSON utxo on the client and pass
+   -- it as a query param
+    :<|> "ex-units"
+      :> ReqBody '[JSON] ExUnitsRequest
+      :> Post '[JSON] ExUnitsResponse
 
 app :: Env -> Application
 app = simpleCors . serve api . appServer
@@ -66,10 +83,11 @@ api :: Proxy Api
 api = Proxy
 
 server :: ServerT Api AppM
-server = Fees.estimateTxFees
+server = Fees.estimateTxFees :<|> error "TODO"
 
 apiDocs :: Docs.API
 apiDocs = Docs.docs api
 
 getTransactionFeeEstimate :: Cbor -> ClientM Fee
-getTransactionFeeEstimate = client api
+getExUnits :: ExUnitsRequest -> ClientM ExUnitsResponse
+getTransactionFeeEstimate :<|> getExUnits = client api

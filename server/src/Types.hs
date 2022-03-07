@@ -83,6 +83,7 @@ newtype Cbor = Cbor Text
     , FromHttpApiData
     , ToHttpApiData
     , FromJSON
+    , ToJSON
     )
 
 newtype Fee = Fee Integer
@@ -112,18 +113,13 @@ data ExUnitsRequest = ExUnitsRequest
   , utxo :: C.UTxO C.AlonzoEra
   }
   deriving stock (Show, Eq, Generic)
-
-instance FromJSON ExUnitsRequest where
-  parseJSON = Aeson.genericParseJSON Aeson.defaultOptions
+  deriving anyclass (FromJSON, ToJSON)
 
 -- @evaluateTransactionExecutionUnits@ returns a @Map@ which would not be
 -- particularly JSON-friendly as it would have @ScriptWitnessIndex@ keys
 newtype ExUnitsResponse = ExUnitsResponse [ExUnitsResult]
   deriving stock (Show, Generic)
-  deriving newtype (Eq)
-
-instance ToJSON ExUnitsResponse where
-  toJSON = Aeson.genericToJSON Aeson.defaultOptions
+  deriving newtype (Eq, FromJSON, ToJSON)
 
 exUnitsFromCardanoMap ::
   Map
@@ -158,9 +154,7 @@ data ExUnitsResult = ExUnitsResult
     exUnits :: Either Text ExUnits
   }
   deriving stock (Show, Eq, Generic)
-
-instance ToJSON ExUnitsResult where
-  toJSON = Aeson.genericToJSON Aeson.defaultOptions
+  deriving anyclass (ToJSON, FromJSON)
 
 data RedeemerTag
   = Spend
@@ -168,12 +162,11 @@ data RedeemerTag
   | Cert
   | Reward
   deriving stock (Show, Eq, Generic, Ord)
-
-instance ToJSON RedeemerTag where
-  toJSON = Aeson.genericToJSON Aeson.defaultOptions
+  deriving anyclass (ToJSON, FromJSON)
 
 newtype ScriptIndex = ScriptIndex Word
   deriving stock (Show, Eq)
+  deriving newtype (FromJSON)
 
 instance ToJSON ScriptIndex where
   -- to avoid issues with integer parsing in PS, we should probably return
@@ -184,7 +177,7 @@ instance ToJSON ScriptIndex where
 
 newtype ExUnits = ExUnits C.ExecutionUnits
   deriving stock (Show, Generic)
-  deriving newtype (Eq)
+  deriving newtype (Eq, FromJSON)
 
 instance ToJSON ExUnits where
   toJSON (ExUnits (C.ExecutionUnits mem steps)) =
@@ -234,3 +227,9 @@ instance Docs.ToSample Fee where
       , Fee 160265
       )
     ]
+
+instance Docs.ToSample ExUnitsRequest where
+  toSamples = error "TODO"
+
+instance Docs.ToSample ExUnitsResponse where
+  toSamples = error "TODO"
