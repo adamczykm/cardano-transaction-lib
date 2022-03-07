@@ -54,6 +54,7 @@ library
     , bytestring
     , cardano-api
     , cardano-binary
+    , cardano-slotting
     , containers
     , exceptions
     , extra

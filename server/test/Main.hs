@@ -80,10 +80,7 @@ feeEstimateSpec = around withFeeEstimate $ do
       _ -> False
 
 withFeeEstimate :: ActionWith (Port -> IO ())
-withFeeEstimate = Warp.testWithApplication $ app <$> newEnvIO'
-  where
-    newEnvIO' :: IO Env
-    newEnvIO' = either die pure =<< newEnvIO
+withFeeEstimate = Warp.testWithApplication $ app <$> newEnvIO
 
 runClientM' ::
   forall (a :: Type).

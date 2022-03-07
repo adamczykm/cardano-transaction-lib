@@ -10,6 +10,7 @@ module Types (
 
 import Cardano.Api.Shelley qualified as Shelley
 import Cardano.Binary qualified as Cbor
+import Cardano.Slotting.Time (SystemStart)
 import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
@@ -18,8 +19,6 @@ import Data.Aeson (FromJSON, ToJSON (..))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Encoding qualified as Aeson.Encoding
 import Data.Aeson.Types (withText)
-import Data.Bifunctor (second)
-import Data.Functor ((<&>))
 import Data.Kind (Type)
 import Data.Text (Text)
 import Data.Text qualified as Text
@@ -27,6 +26,7 @@ import GHC.Generics (Generic)
 import Paths_cardano_browser_tx_server (getDataFileName)
 import Servant (FromHttpApiData, QueryParam', Required, ToHttpApiData)
 import Servant.Docs qualified as Docs
+import System.Exit (die)
 import Text.Read (readMaybe)
 import Utils (tshow)
 
@@ -40,16 +40,20 @@ newtype AppM (a :: Type) = AppM (ReaderT Env IO a)
     , MonadThrow
     )
 
-newtype Env = Env
-  { protocolParams :: Shelley.ProtocolParameters
+data Env = Env
+  { systemStart :: SystemStart
+  , protocolParams :: Shelley.ProtocolParameters
   }
   deriving stock (Generic)
 
-newEnvIO :: IO (Either String Env)
-newEnvIO =
-  getDataFileName "config/pparams.json"
-    >>= Aeson.eitherDecodeFileStrict @Shelley.ProtocolParameters
-    <&> second Env
+newEnvIO :: SystemStart -> IO Env
+newEnvIO systemStart = Env systemStart <$> readParams
+  where
+    readParams :: IO Shelley.ProtocolParameters
+    readParams =
+      either die pure
+        =<< Aeson.eitherDecodeFileStrict @Shelley.ProtocolParameters
+        =<< getDataFileName "config/pparams.json"
 
 newtype Cbor = Cbor Text
   deriving stock (Show)
