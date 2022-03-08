@@ -76,9 +76,15 @@ appServer env = hoistServer api appHandler server
         handleError ::
           CardanoBrowserServerError ->
           Handler a
-        handleError (DecodeError fe) = case fe of
-          InvalidCbor ic -> throwError err400 {errBody = lbshow ic}
-          InvalidHex ih -> throwError err400 {errBody = LC8.pack ih}
+        handleError = \case
+          DecodeError fe -> case fe of
+            InvalidCbor ic -> throwError err400 {errBody = lbshow ic}
+            InvalidHex ih -> throwError err400 {errBody = LC8.pack ih}
+          ExUnitsError txErr ->
+            throwError
+              err400
+                { errBody = LC8.pack $ show txErr
+                }
 
 api :: Proxy Api
 api = Proxy

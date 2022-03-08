@@ -186,7 +186,9 @@ instance ToJSON ExUnits where
 -- Errors
 
 -- We'll probably extend this with more error types over time
-newtype CardanoBrowserServerError = DecodeError DecodeError
+data CardanoBrowserServerError
+  = DecodeError DecodeError
+  | ExUnitsError C.TransactionValidityIntervalError
   deriving stock (Show)
 
 instance Exception CardanoBrowserServerError
