@@ -12,6 +12,7 @@ module Types (
   RedeemerTag (..),
   ScriptIndex (..),
   ExUnits (..),
+  ExUnit (..),
   DecodeError (..),
   CardanoBrowserServerError (..),
   newEnvIO,
@@ -26,7 +27,7 @@ import Control.Exception (Exception)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.IO.Class (MonadIO)
 import Control.Monad.Reader (MonadReader, ReaderT)
-import Data.Aeson (FromJSON (parseJSON), KeyValue ((.=)), ToJSON (toJSON))
+import Data.Aeson (FromJSON (parseJSON), ToJSON (toJSON))
 import Data.Aeson qualified as Aeson
 import Data.Aeson.Types (withText)
 import Data.Bifunctor (bimap, second)
@@ -37,6 +38,7 @@ import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.Time.Format.ISO8601 (iso8601ParseM)
 import GHC.Generics (Generic)
+import GHC.Natural (Natural)
 import Paths_cardano_browser_tx_server (getDataFileName)
 import Servant (FromHttpApiData, QueryParam', Required, ToHttpApiData)
 import Servant.Docs qualified as Docs
@@ -137,7 +139,7 @@ exUnitsFromCardanoMap = ExUnitsResponse . fmap (uncurry f) . Map.toList
       ExUnitsResult
     f swi es =
       let (tag, index) = convertIndex swi
-          exUnits = bimap tshow ExUnits es
+          exUnits = bimap tshow fromCardanoExUnits es
        in ExUnitsResult {tag, index, exUnits}
 
     convertIndex :: C.ScriptWitnessIndex -> (RedeemerTag, ScriptIndex)
@@ -147,6 +149,10 @@ exUnitsFromCardanoMap = ExUnitsResponse . fmap (uncurry f) . Map.toList
         C.ScriptWitnessIndexMint idx -> (Mint, idx)
         C.ScriptWitnessIndexCertificate idx -> (Cert, idx)
         C.ScriptWitnessIndexWithdrawal idx -> (Reward, idx)
+
+    fromCardanoExUnits :: C.ExecutionUnits -> ExUnits
+    fromCardanoExUnits (C.ExecutionUnits steps mem) =
+      ExUnits (ExUnit steps) (ExUnit mem)
 
 data ExUnitsResult = ExUnitsResult
   { tag :: RedeemerTag
@@ -170,18 +176,16 @@ newtype ScriptIndex = ScriptIndex Word
   deriving stock (Show, Eq)
   deriving (FromJSON, ToJSON) via Stringified Word
 
--- TODO replace this with data type holding `Stringified` fields
-newtype ExUnits = ExUnits C.ExecutionUnits
-  deriving stock (Show, Generic)
-  deriving newtype (Eq, FromJSON)
+data ExUnits = ExUnits
+  { steps :: ExUnit
+  , mem :: ExUnit
+  }
+  deriving stock (Eq, Show, Generic)
+  deriving anyclass (FromJSON, ToJSON)
 
-instance ToJSON ExUnits where
-  toJSON (ExUnits (C.ExecutionUnits mem steps)) =
-    -- Again, encode naturals as text to avoid precision loss
-    Aeson.object
-      [ "mem" .= tshow mem
-      , "steps" .= tshow steps
-      ]
+newtype ExUnit = ExUnit Natural
+  deriving stock (Show, Eq)
+  deriving (FromJSON, ToJSON) via Stringified Natural
 
 -- Errors
 
