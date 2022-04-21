@@ -81,6 +81,34 @@ let
           touch $out
         '';
       });
+
+  bundlePursProject = { name, src, browserRuntime ? true, ... }:
+    let
+      nodeModules = mkNodeModules { };
+    in
+    pkgs.stdenv.mkDerivation {
+      inherit src;
+      name = "${name}-bundle-" + (if browserRuntime then "web" else "nodejs");
+      buildInputs = [ nodejs ];
+      unpackPhase = ''
+        cp -r ${nodeModules}/lib/node_modules .
+        chmod -R u+rw node_modules
+        cp -r $src/* .
+        export NODE_PATH="$PWD/node_modules:$NODE_PATH"
+        export PATH="${nodeModules}/bin:$PATH"
+      '';
+      buildPhase =
+        let
+          buildEnv = pkgs.lib.optionalString browserRuntime "BROWSER_RUNTIME=1";
+        in
+        ''
+          ${buildEnv} webpack --mode=production
+        '';
+      installPhase = ''
+        mkdir $out
+        mv output $out/
+      '';
+    };
 in
 rec {
   defaultPackage = packages.cardano-transaction-lib;
